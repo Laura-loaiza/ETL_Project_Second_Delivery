@@ -127,7 +127,7 @@ Sigue la estructura que pedía el entregable (extraer, transformar, merge, calid
 **Por qué está diseñada así.**
 - **Tres ramas, una por fuente.** Cada fuente tiene formato y fallos distintos. Con ramas separadas se ve en cuál falló el DAG y solo se reintenta esa lectura.
 - **Validación en dos momentos.** La de cada `transform_*` detiene los datos malos de origen; la de `quality_check` comprueba que la unión sea coherente antes de cargar.
-- **Archivos temporales entre tareas, no XCom.** Las tablas son grandes; así Airflow se mantiene liviano y cada tarea se puede probar sola.
+- **Archivos temporales entre tareas.** Las tablas son grandes, así que cada tarea guarda su resultado en un archivo y la siguiente lo lee. Así Airflow se mantiene liviano y cada tarea se puede probar sola.
 - **`load` reemplaza la tabla y `store` exporta el CSV leyendo esa misma tabla.** Repetir el DAG no duplica filas y el CSV es idéntico a lo cargado.
 - **Streamlit lee del warehouse, no de los archivos.** El enunciado exige que las visualizaciones se construyan sobre datos validados y almacenados.
 - **Registro de validaciones.** Cada regla queda en un archivo, para poder auditar qué se validó y con qué resultado.
@@ -163,7 +163,7 @@ El modelo de la entrega 1 se conserva y se le agrega una segunda constelación a
 | De | A | Tipo | Estado |
 |---|---|---|---|
 | `fact_hogares` y `fact_personas` | `dim_hogar`, `dim_persona`, `dim_geografia`, `dim_tiempo` | N:1 (llaves foráneas) | Implementadas en la Entrega 1 (DDL con PK y FK) |
-| `merge_departamento` | `dim_departamento` | 1:1 por `codigo_departamento` | Propuesta |
+| `merge_departamento` | `dim_departamento` | 1:1 por `codigo_departamento` | Implementado |
 | `dim_geografia` | `dim_departamento` | N:1, por nombre (`dpto` = `nombre_departamento`) | Relación lógica, sin llave foránea |
 
 **Decisiones de diseño y justificación.**
@@ -590,7 +590,7 @@ El DAG vive en `dags/pobreza_dag.py` (se genera desde `merge_definitivo.ipynb`) 
 |---|---|---|
 | `read_api` | Descarga el IPM de la API, con paginación y reintentos | 1 (10 s) |
 | `read_csv` | Lee el CSV de viviendas | 1 (10 s) |
-| `read_db` | Lee personas (hechos, dimensión y geografía) y hogares con pobreza monetaria | 1 (10 s) |
+| `read_db` | Lee personas (hechos, dimensión y geografía) y hogares con pobreza monetaria | 0 (límite de 25 min) |
 | `transform_api`, `transform_csv`, `transform_db` | Limpian cada fuente y la validan con Great Expectations; si no cumple, se detienen | 0 |
 | `merge` | Resume cada fuente a una fila por departamento y las une; revisa que no haya departamentos repetidos | 0 |
 | `quality_check` | Valida el resultado del merge | 0 |
@@ -600,8 +600,8 @@ El DAG vive en `dags/pobreza_dag.py` (se genera desde `merge_definitivo.ipynb`) 
 **Programación.** El DAG `pobreza_dag` se ejecuta una vez al día (`schedule="@daily"`, a las 00:00 UTC) con `catchup=False`, es decir, no se recuperan los días anteriores. Cada ejecución vuelve a leer las tres fuentes y reemplaza la tabla `merge_departamento`, así que se puede repetir sin duplicar datos. En Colab la variable `DAG_SCHEDULE=none` solo desactiva el horario para lanzarlo a mano; en el repositorio queda `@daily`. En Colab el DAG solo corre mientras la sesión esté abierta; para una ejecución diaria continua, Airflow debe estar siempre encendido (por ejemplo, en Docker).
 
 **Decisiones de diseño.**
-- Cada tarea guarda su resultado en un archivo temporal (`staging`) y la siguiente lo lee; no se pasan dataframes por XCom.
-- Las tareas de lectura, `load` y `store` se reintentan una vez porque el fallo puede ser pasajero (API o base lentas). Las tareas `transform_*`, `merge` y `quality_check` no se reintentan: si los datos están mal, repetir no lo arregla.
+- Cada tarea guarda su resultado en un archivo temporal (`staging`) y la siguiente lo lee; los datos no pasan directamente de una tarea a otra.
+- `read_api`, `read_csv`, `load` y `store` se reintentan una vez (10 s después) porque el fallo puede ser pasajero. `read_db` no se reintenta: la consulta de personas trae 773.932 filas y, si falla porque la base está lenta, un segundo intento abre otra consulta igual de pesada mientras la primera puede seguir abierta en Supabase, y la satura más. Por eso tiene un límite de 25 minutos: si se pasa, falla con un mensaje claro. `transform_*`, `merge` y `quality_check` tampoco se reintentan: si los datos están mal, repetir no lo arregla.
 - La validación con Great Expectations es la compuerta de calidad: si falla una regla, la tarea falla, las siguientes no se ejecutan y la tabla final no se modifica.
 - `max_active_runs=1`: no corren dos ejecuciones a la vez.
 - En Colab las tres ramas corren una después de la otra (Airflow usa SQLite), no en paralelo.
