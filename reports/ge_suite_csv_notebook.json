@@ -1,0 +1,7 @@
+{
+  "suite": "suite_csv",
+  "run": "notebook",
+  "passed": true,
+  "reglas_total": 21,
+  "fallidas": []
+}

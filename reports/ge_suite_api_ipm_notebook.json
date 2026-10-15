@@ -1,0 +1,7 @@
+{
+  "suite": "suite_api_ipm",
+  "run": "notebook",
+  "passed": true,
+  "reglas_total": 54,
+  "fallidas": []
+}

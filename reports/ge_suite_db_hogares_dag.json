@@ -1,0 +1,7 @@
+{
+  "suite": "suite_db_hogares",
+  "run": "dag",
+  "passed": true,
+  "reglas_total": 5,
+  "fallidas": []
+}

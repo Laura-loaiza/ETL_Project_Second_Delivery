@@ -1,0 +1,7 @@
+{
+  "suite": "suite_merge_departamento",
+  "run": "notebook",
+  "passed": true,
+  "reglas_total": 24,
+  "fallidas": []
+}

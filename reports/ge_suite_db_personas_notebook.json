@@ -1,0 +1,7 @@
+{
+  "suite": "suite_db_personas",
+  "run": "notebook",
+  "passed": true,
+  "reglas_total": 12,
+  "fallidas": []
+}
