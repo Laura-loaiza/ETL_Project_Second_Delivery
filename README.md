@@ -57,7 +57,7 @@ Nivel persona:
 | Carga a base relacional | Listo: tabla `merge_departamento` cargada en PostgreSQL (Supabase) con `DESTINO_URL`. Sin esa variable el DAG usa SQLite (pruebas) |
 | Reporte con consultas SQL sobre la tabla cargada | Listo: 9 cifras, 3 gráficas y conclusiones |
 | Streamlit | Listo (`streamlit_visualizaciones_definitivo.ipynb`, sección 5.6) |
-| Diagramas de arquitectura y de modelo dimensional | Listos (`diagramas/`, secciones 4.1 y 4.2). `dim_departamento` |
+| Diagramas de arquitectura y de modelo dimensional | Listos (`diagramas/`, secciones 4.1 y 4.2). |
 
 ---
 ## 3. Stack tecnológico
@@ -156,7 +156,7 @@ El modelo de la entrega 1 se conserva y se le agrega una segunda constelación a
 | Tabla | Tipo | Grano | Contenido | Estado |
 |---|---|---|---|---|
 | `merge_departamento` | Hecho | Departamento | 16 columnas: marcas de cobertura (`en_ipm`, `en_csv`, `en_db`), bloque IPM, bloque de vivienda, bloque monetario y la diferencia entre IPM y pobreza monetaria (sección 5.5) | Implementada: la carga la tarea `load` |
-| `dim_departamento` | Dimensión | Departamento (33 filas) | `codigo_departamento` (PK, texto de 2 dígitos) y `nombre_departamento` (único), tomados del catálogo `DEPARTAMENTOS` | Implementada (sin PK/FK) |
+| `dim_departamento` | Dimensión | Departamento (33 filas) | `codigo_departamento` (PK, texto de 2 dígitos) y `nombre_departamento` (único), tomados del catálogo `DEPARTAMENTOS` | Implementada |
 
 **Relaciones.**
 
@@ -437,7 +437,6 @@ Cada validación usa una `ExpectationSuite` de Great Expectations 1.x y deja:
 - `reports/validation_log.csv`: una fila por regla (fecha, suite, regla, parámetros, resultado y porcentaje fuera de la regla), compartido por los tres notebooks.
 - `reports/ge_<suite>_notebook.json`: resumen de cada corrida.
 - `reports/hallazgos_api.md`, `hallazgos_csv.md` y `hallazgos_db.md`: resumen automático del EDA.
-- `reports/eda_*.png`: gráficos del EDA de cada fuente.
 
 **Resumen de las suites de Great Expectations**
 
@@ -456,13 +455,24 @@ Cada notebook escribe en el mismo `validation_log.csv`; antes de entregar, convi
 ---
 ## 9. Cómo ejecutar
 
-> **Nota sobre los enlaces de als visualizaciones con streamlit.** Si alguna página da un error, no carga o muestra un error de código (el enlace de Cloudflare de Airflow o las gráficas de Streamlit), hay que recargar la página. Con recargarla hasta unas 5 veces se arregla.
+> **Nota sobre los enlaces de las visualizaciones con streamlit.** Si alguna página da un error, no carga o muestra un error de código (el enlace de Cloudflare de Airflow o las gráficas de Streamlit), hay que recargar la página. Con recargarla hasta unas 5 veces se arregla.
 
-**Requisitos:** Google Colab, o Python 3.10+ en local, con:
+**Requisitos.**
+- **Google Colab (recomendado).** No hay nada que instalar a mano: cada notebook instala sus librerías en su primera celda (`!pip install ...`).
+- **Fuera de Colab (opcional).** Python 3.12 y, desde la raíz del repositorio:
 
 ```bash
-pip install "great-expectations>=1.0,<2" pandas pyarrow requests matplotlib scipy sqlalchemy psycopg2-binary
+  pip install -r requirements.txt
 ```
+
+Apache Airflow no está en `requirements.txt` porque exige un archivo de versiones compatibles. Se instala aparte (en Colab, el Paso 9 del merge lo hace en un entorno aislado):
+
+```bash
+  pip install "apache-airflow==2.11.2" \
+    --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.11.2/constraints-3.12.txt"
+```
+
+**Datos.** Los datos no están en el repositorio por su tamaño. La carpeta `etl_proyecto` (con `viviendas_pdtos.csv`, `db_export/` y `merge_departamento.csv`) se descarga del enlace de Drive que aparece en [`data/README.md`](data/README.md). Para usarla en Colab hay que copiarla a `Mi unidad/Colab Notebooks/etl_proyecto/`; los pasos detallados están en ese archivo.
 
 **Carpeta de trabajo.** En Colab, `Mi unidad/Colab Notebooks/etl_proyecto/`; en local, `./etl_proyecto/`. Se crean `staging/` (archivos intermedios) y `reports/` (registros y gráficos), y `db_export/` guarda la copia de la base. Esta carpeta de trabajo está fuera del repositorio: al subir a GitHub solo se copian `reports/` (sin datos personales), los notebooks y el DAG.
 
@@ -508,42 +518,61 @@ Con Supabase desde Colab se recomienda la cadena del *Session pooler* (la conexi
 ├── README.md
 ├── .gitignore
 ├── requirements.txt
-├── .env.examples  # nombres de las variables, sin valores
-├── notebooks/
+├── .env.example                 # nombres de las variables, sin valores
+├── notebook/
 │   ├── 01_fuente_api_ipm_def.ipynb
 │   ├── 02_fuente_csv_def.ipynb
 │   ├── 03_fuente_base_de_datos_def.ipynb
 │   ├── merge_definitivo.ipynb
-│   ├── streamlit_visualizaciones_definitivo.ipynb
+│   └── streamlit_visualizaciones_definitivo.ipynb
 ├── dags/
-│   └── pobreza_dag.py         # DAG de Airflow (10 tareas, @daily)
+│   └── pobreza_dag.py           # DAG de Airflow (10 tareas, @daily)
 ├── streamlit/
-│   └──app.py               # la genera streamlit_visualizaciones_definitivo.ipynb
-├── graficas/                # validation_log.csv, resúmenes de Great Expectations, hallazgos, gráficas y diagramas.
-    ├──dashboard/    
-       └──...
-    └──eda/                # graficos relacioandos a los eda realizados
-       └──...
-├── reports/                # validation_log.csv, resúmenes de Great Expectations, hallazgos, gráficas y diagramas.
-    ├──...          
-├── diagramas/
-│   ├── Diagrama Arquitectura - Entrega 2.png   # arquitectura (sección 4.1)
-│   ├── Diagrama Galaxia - Entrega 2.png        # modelo dimensional (sección 4.2)
-│   └── Grafo del DAG.jpeg                      # esquema de la ejecución del DAG
+│   └── app.py                   # la genera streamlit_visualizaciones_definitivo.ipynb
+├── data/
+│   ├── README.md                # de dónde descargar los datos (enlace de Drive)
+├── graficas/
+│   ├── dashboard/               # capturas de Streamlit y gráficas del reporte
+│   └── eda/                     # gráficas del EDA de cada fuente
+├── reports/                     # validation_log.csv, ge_*.json y hallazgos_*.md
+└── diagramas/
+    ├── Diagrama_Arquitectura-Entrega_2.png   # arquitectura (sección 4.1)
+    ├── Diagrama_Galaxia-Entrega_2.png        # modelo dimensional (sección 4.2)
+    └── Grafo_del_DAG.jpeg                    # ejecución del DAG
 ```
 
-El `.gitignore` debe excluir como mínimo:
+El `.gitignore` excluye los secretos, los datos y los archivos intermedios:
 
 ```
+# secretos
 .env
+
+# datos y archivos intermedios
+etl_proyecto/
+staging/
 *.parquet
 *.pkl
-*.csv          # salvo reports/validation_log.csv y merge_departamento.csv si se quieren versionar
-etl_proyecto/
+*.db
+*.sqlite
+data/*.csv
+
+# Airflow
 airflow/
+logs/
+
+# Python y notebooks
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# Streamlit
+streamlit.log
 ```
 
-Antes de subir los notebooks, **borrar las salidas de las celdas**: la conexión a la base imprime el usuario del pooler (contiene el identificador del proyecto de Supabase) y el servidor, y el notebook 02 deja tablas con datos de hogares. Se recomienda además quitar del código la línea que imprime el usuario y el largo de la contraseña.
+Los notebooks se publican con sus salidas como evidencia de la ejecución y no contienen contraseñas ni cadenas de conexión. Si se vuelven a ejecutar con `DATABASE_URL`, hay que revisar la celda de conexión, que imprime el usuario y el servidor (no la contraseña), antes de volver a subirlos.
+
 ---
 ## 11. DAG de Airflow (`pobreza_dag`)
 
@@ -566,7 +595,7 @@ El DAG vive en `dags/pobreza_dag.py` (se genera desde `merge_definitivo.ipynb`) 
 | `merge` | Resume cada fuente a una fila por departamento y las une; revisa que no haya departamentos repetidos | 0 |
 | `quality_check` | Valida el resultado del merge | 0 |
 | `load` | Guarda `merge_departamento` en la base relacional y compara el número de filas con el del dataframe | 1 (10 s) |
-| `store` | Genera `merge_departamento.csv` leyendo la tabla | 1 (10 s) |
+| `store` | Genera `merge_departamento.csv` y `dim_departamento.csv` leyendo la tabla | 1 (10 s) |
 
 **Programación.** El DAG `pobreza_dag` se ejecuta una vez al día (`schedule="@daily"`, a las 00:00 UTC) con `catchup=False`, es decir, no se recuperan los días anteriores. Cada ejecución vuelve a leer las tres fuentes y reemplaza la tabla `merge_departamento`, así que se puede repetir sin duplicar datos. En Colab la variable `DAG_SCHEDULE=none` solo desactiva el horario para lanzarlo a mano; en el repositorio queda `@daily`. En Colab el DAG solo corre mientras la sesión esté abierta; para una ejecución diaria continua, Airflow debe estar siempre encendido (por ejemplo, en Docker).
 
@@ -575,15 +604,10 @@ El DAG vive en `dags/pobreza_dag.py` (se genera desde `merge_definitivo.ipynb`) 
 - Las tareas de lectura, `load` y `store` se reintentan una vez porque el fallo puede ser pasajero (API o base lentas). Las tareas `transform_*`, `merge` y `quality_check` no se reintentan: si los datos están mal, repetir no lo arregla.
 - La validación con Great Expectations es la compuerta de calidad: si falla una regla, la tarea falla, las siguientes no se ejecutan y la tabla final no se modifica.
 - `max_active_runs=1`: no corren dos ejecuciones a la vez.
-- - En Colab las tres ramas corren una después de la otra (Airflow usa SQLite), no en paralelo.
+- En Colab las tres ramas corren una después de la otra (Airflow usa SQLite), no en paralelo.
 - Si el origen es la copia en CSV (sin `DATABASE_URL`), `read_db` lee de una SQLite armada con esos CSV; con PostgreSQL lee de Supabase. El resto del DAG no cambia.
 - Para ver el DAG en Colab, el notebook levanta el scheduler y el servidor web de Airflow y abre un enlace de Cloudflare. Si el enlace no carga, se recarga la página (ver la nota de la sección 9).
 ---
-## 12. Pendiente antes de entregar
-
-1. Subir al repositorio `dags/pobreza_dag.py`, las gráficas, `app.py` y los PNG de la carpeta `diagramas/`, con las salidas de los notebooks borradas (sección 10).
-2. Antes de entregar, borrar `validation_log.csv` y volver a correr los notebooks para que no queden corridas de prueba repetidas.
-3. `dim_departamento` y las llaves foráneas (sección 4.2) quedan como propuesta de diseño: la tabla `merge_departamento` se carga sin ellas. Implementarlas implicaría ajustar `load` (DDL con PK y FK, y vaciar e insertar en lugar de reemplazar).
 
 ### Relación con el entregable
 
@@ -595,9 +619,9 @@ El DAG vive en `dags/pobreza_dag.py` (se genera desde `merge_definitivo.ipynb`) 
 | Transformación y merge | Secciones 5 y 5.5; tareas `transform_*` y `merge` | Listo |
 | Great Expectations integrado al DAG | Secciones 8 y 11; 5 suites | Listo |
 | Carga a base relacional | Sección 5.5; tarea `load` | Listo (Supabase) |
-| Modelo de datos documentado | Sección 4.2 y `diagramas/diagrama_galaxia_entrega2.drawio` | Listo; `dim_departamento` y las llaves foráneas quedan como propuesta de diseño |
+| Modelo de datos documentado | Sección 4.2 y `diagramas/Diagrama_Galaxia-Entrega_2.png` | Listo; `dim_departamento` y las llaves foráneas quedan como propuesta de diseño |
 | Visualizaciones | Sección 5.5 (reporte SQL, 3 gráficas) y sección 5.6 (Streamlit) | Listo |
 | API: detalles y por qué se eligió | Sección 5.2 | Listo |
-| Diagrama de arquitectura | Sección 4.1 y `diagramas/arquitectura_pipeline_entrega2.drawio` | Listo |
+| Diagrama de arquitectura | Sección 4.1 y `diagramas/Diagrama_Arquitectura-Entrega_2.png` | Listo |
 | Supuestos y decisiones | Sección 7 | Listo |
 | `.gitignore`, README, visualizaciones | Secciones 5.6 y 10 | Listo; falta subir al repositorio (punto 1 de la sección 12) |
