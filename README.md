@@ -156,7 +156,7 @@ El modelo de la entrega 1 se conserva y se le agrega una segunda constelación a
 | Tabla | Tipo | Grano | Contenido | Estado |
 |---|---|---|---|---|
 | `merge_departamento` | Hecho | Departamento | 16 columnas: marcas de cobertura (`en_ipm`, `en_csv`, `en_db`), bloque IPM, bloque de vivienda, bloque monetario y la diferencia entre IPM y pobreza monetaria (sección 5.5) | Implementada: la carga la tarea `load` |
-| `dim_departamento` | Dimensión | Departamento (33 filas) | `codigo_departamento` (PK, texto de 2 dígitos) y `nombre_departamento` (único), tomados del catálogo `DEPARTAMENTOS` | Propuesta: pendiente de implementar |
+| `dim_departamento` | Dimensión | Departamento (33 filas) | `codigo_departamento` (PK, texto de 2 dígitos) y `nombre_departamento` (único), tomados del catálogo `DEPARTAMENTOS` | Implementada (sin PK/FK) |
 
 **Relaciones.**
 
