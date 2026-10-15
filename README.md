@@ -144,7 +144,7 @@ El modelo de la entrega 1 se conserva y se le agrega una segunda constelación a
 
 | Tabla | Tipo | Grano | Contenido |
 |---|---|---|---|
-| `fact_hogares` | Hecho | Hogar | Ingresos, líneas de pobreza e indigencia, brechas, banderas `pobre` e `indigente`, `fex_c`, `fex_dpto` |
+| `fact_hogares` | Hecho | Hogar | Ingresos, líneas de pobreza e indigencia, brechas, banderas `pobre` e `indigente`, `fex_c` |
 | `fact_personas` | Hecho | Persona | Ingresos, empleo principal y secundario, factores de expansión y versiones logarítmicas |
 | `dim_hogar` | Dimensión | Hogar | `directorio`, `secuencia_p`, tenencia y tamaño del hogar en rangos |
 | `dim_persona` | Dimensión | Persona | Sexo, edad, parentesco, nivel educativo, `condicion_laboral`, `pet`, `rango_edad` |
@@ -174,7 +174,7 @@ El modelo de la entrega 1 se conserva y se le agrega una segunda constelación a
 5. **El enlace con `dim_geografia` es lógico, por nombre.** Agregarle una columna de código no es estable y los notebooks de la Entrega 1 recrean esa tabla (DROP y CREATE) y la columna se perdería al volver a correrlos.
 6. **Sin vínculo con `dim_tiempo`.** Las fuentes son cortes de una sola vigencia y de períodos distintos (IPM 2025; la GEIH de la primera entrega cubre 12 meses según `dim_tiempo`), así que la tabla nueva no tiene eje de tiempo.
 7. **Sin vínculo con `dim_hogar`.** Esa dimensión contiene hogares de la GEIH; los del IPM son de otra encuesta y no son los mismos hogares.
-8. **Ponderación.** El IPM y la pobreza monetaria usan `fex_c`; el CSV no se pondera porque no trae factor de expansión. En la Entrega 1 los cortes departamentales usaron `fex_dpto`: queda como decisión por confirmar.
+8. **Ponderación.** El IPM y la pobreza monetaria usan `fex_c`; el CSV no se pondera porque no trae factor de expansión. En la Entrega 1 los cortes departamentales usaron `fex_dpto`: la pobreza monetaria usa fex_c porque fact_hogares no trae fex_dpto.
 9. **Cobertura.** La GEIH cubre 24 de los 33 departamentos; las comparaciones entre medidas usan los 24 con las tres fuentes y al menos 30 hogares en la muestra del IPM.
 
 ---
