@@ -9,6 +9,8 @@ staging/
 *.db
 *.sqlite
 
+data/*.csv
+
 # Airflow
 airflow/
 logs/
