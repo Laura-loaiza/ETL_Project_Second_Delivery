@@ -29,7 +29,7 @@ Analizar la pobreza monetaria, la pobreza extrema (indigencia) y la pobreza mult
 1. Una comparación por departamento entre pobreza monetaria (GEIH) y pobreza multidimensional (IPM): cuánto se parecen y dónde se separan.
 2. Qué condiciones de vivienda (sin acueducto, sin alcantarillado, piso de tierra, zona rural dispersa) acompañan a la pobreza multidimensional de cada departamento.
 3. Un dataset final, `merge_departamento` (una fila por departamento), validado y cargado en una base relacional.
-4. Un reporte con cifras y gráficas que salen **solo** de esa tabla cargada (consultas SQL), y una aplicación en Streamlit que lea el mismo resultado _(pendiente)_.
+4. Un reporte con cifras y gráficas que salen **solo** de esa tabla cargada (consultas SQL), y una aplicación en Streamlit que lee ese mismo resultado.
 
 ### Preguntas de negocio de la Entrega 1
 Nivel hogar:
@@ -45,21 +45,20 @@ Nivel persona:
 8. ¿Cómo se comportan los ingresos de las personas según la condición de pobreza de su hogar?
 
 ---
-## 2. Estado de la Entrega 2
+## 2. Checklist estado de la Entrega 2
 
 | Etapa | Estado |
 |---|---|
 | Extracción, EDA, transformación y validación con Great Expectations de las 3 fuentes | Listo (notebooks 01, 02 y 03) |
 | Pobreza monetaria agregada por departamento (GEIH, ponderada con `fex_c`) | Listo (notebook 03, `db_monetaria_dpto.parquet`); se valida de forma indirecta en la suite del merge |
-| Merge por departamento | Listo (`merge_completote.ipynb`): 33 filas x 16 columnas |
+| Merge por departamento | Listo (`merge_definitivo.ipynb`): 33 filas x 16 columnas |
 | Validación con Great Expectations sobre el dataset unido | Listo (`suite_merge_departamento`, 24 reglas) |
 | DAG de Apache Airflow | Listo (`pobreza_dag`, 10 tareas, `@daily`) |
-| Carga a base relacional | Listo: tabla `merge_departamento`. SQLite por defecto; PostgreSQL definiendo `DESTINO_URL` |
-| Reporte con consultas SQL sobre la tabla cargada | Listo en el notebook (3 gráficas); falta completar la conclusión de la gráfica 3 |
-| Streamlit | Pendiente |
-| Modelo dimensional documentado y diagrama final | Pendiente / parcial (el diagrama del pipeline se genera en el notebook; falta subirlo al repositorio) |
+| Carga a base relacional | Listo: tabla `merge_departamento` cargada en PostgreSQL (Supabase) con `DESTINO_URL`. Sin esa variable el DAG usa SQLite (pruebas) |
+| Reporte con consultas SQL sobre la tabla cargada | Listo: 9 cifras, 3 gráficas y conclusiones |
+| Streamlit | Listo (`streamlit_visualizaciones_definitivo.ipynb`, sección 5.6) |
+| Diagramas de arquitectura y de modelo dimensional | Listos (`diagramas/`, secciones 4.1 y 4.2). `dim_departamento` |
 
-La sección 12 relaciona cada punto del entregable con su estado.
 ---
 ## 3. Stack tecnológico
 
@@ -70,11 +69,12 @@ La sección 12 relaciona cada punto del entregable con su estado.
 | Fuente API | Servidor propio en Docker + requests/urllib3 | Servicio HTTP con el IPM; peticiones con reintentos y espera creciente. |
 | Base de datos de origen | PostgreSQL (Supabase) | Contiene el modelo de la Entrega 1 (fuente 3). |
 | Base de datos de destino | SQLite (pruebas) o PostgreSQL (`DESTINO_URL`) | Guarda la tabla final `merge_departamento`. |
-| Conexión Python ↔ BD | SQLAlchemy + psycopg2-binary | Lectura de tablas por bloques y carga del resultado. |
+| Conexión Python ↔ BD | SQLAlchemy + psycopg2-binary (y `psycopg[binary]` en la app) | Lectura de tablas por bloques y carga del resultado. |
 | Calidad de datos | Great Expectations 1.x (`>=1.0,<2`) | Suites de validación, con registro de cada regla. |
 | Orquestación | Apache Airflow (entorno aislado en Colab) | DAG `pobreza_dag`: lectura, transformación, merge, calidad y carga. |
-| Gráficas | matplotlib | EDA y reporte final. |
-| Aplicación | Streamlit | Pendiente: lee `merge_departamento`. |
+| Gráficas | matplotlib (notebooks) y Plotly (Streamlit) | EDA y reporte final en los notebooks; gráficas interactivas en la app. |
+| Aplicación | Streamlit | Muestra los indicadores por departamento; lee `merge_departamento` de la base o del CSV que exporta el DAG. |
+| Acceso desde Colab | Cloudflare (Airflow) y localtunnel (Streamlit) | Enlaces temporales para abrir la interfaz de Airflow y la app desde el navegador. |
 | Control de versiones | Git / GitHub | Código y documentación. |
 ---
 ## 4. Arquitectura y flujo
@@ -103,12 +103,80 @@ La sección 12 relaciona cada punto del entregable con su estado.
           store: merge_departamento.csv (leído de la tabla)
                       │
                       ▼
-          Reporte SQL y gráficas  ·  Streamlit [pendiente]
+          Reporte SQL y gráficas  ·  Streamlit
 
      Orquestación: Apache Airflow, DAG `pobreza_dag`, @daily
 ```
 
-El diagrama gráfico se genera en el notebook del merge (`reports/arquitectura_pipeline.png`).
+### 4.1 Diagrama de arquitectura
+
+![Arquitectura del pipeline](diagramas/Diagrama Arquitectura - Entrega 2.png)
+
+Sigue la estructura que pedía el entregable (extraer, transformar, merge, calidad, carga, data warehouse y visualización) y le agrega Airflow y la validación con Great Expectations. El notebook del merge genera además una versión simple en `reports/arquitectura_pipeline.png`.
+
+**Cómo leerlo.**
+
+| Elemento | Qué representa |
+|---|---|
+| Fuentes (izquierda) | API Docker del IPM, CSV de viviendas y Supabase con las tablas de la Entrega 1 |
+| Caja de Airflow | El DAG `pobreza_dag` con sus 10 tareas (sección 11) |
+| Borde verde grueso | Validación con Great Expectations: dentro de cada `transform_*` y en `quality_check` |
+| Flecha "solo si pasa" y nota roja | Compuerta de calidad: si una validación falla, el DAG se detiene y no se carga nada |
+| Salidas (abajo) | Data Warehouse, CSV final, Streamlit y registro de validaciones (`validation_log.csv`, `ge_*.json`) |
+
+**Por qué está diseñada así.**
+- **Tres ramas, una por fuente.** Cada fuente tiene formato y fallos distintos. Con ramas separadas se ve en cuál falló el DAG y solo se reintenta esa lectura.
+- **Validación en dos momentos.** La de cada `transform_*` detiene los datos malos de origen; la de `quality_check` comprueba que la unión sea coherente antes de cargar.
+- **Archivos temporales entre tareas, no XCom.** Las tablas son grandes; así Airflow se mantiene liviano y cada tarea se puede probar sola.
+- **`load` reemplaza la tabla y `store` exporta el CSV leyendo esa misma tabla.** Repetir el DAG no duplica filas y el CSV es idéntico a lo cargado.
+- **Streamlit lee del warehouse, no de los archivos.** El enunciado exige que las visualizaciones se construyan sobre datos validados y almacenados.
+- **Registro de validaciones.** Cada regla queda en un archivo, para poder auditar qué se validó y con qué resultado.
+
+**Nota sobre el destino.** El diagrama muestra Supabase (PostgreSQL) como warehouse, y ahí quedó cargada la tabla `merge_departamento`. Si no se define `DESTINO_URL` (por ejemplo, en pruebas en Colab), el DAG carga en SQLite.
+
+### 4.2 Modelo dimensional (esquema de galaxia/estrella)
+
+![Modelo dimensional](diagramas/Diagrama Galaxia - Entrega 2.png)
+
+El modelo de la entrega 1 se conserva y se le agrega una segunda constelación a nivel de departamento.
+
+**Constelación 1 — Entrega 1 (GEIH, sin cambios).**
+
+| Tabla | Tipo | Grano | Contenido |
+|---|---|---|---|
+| `fact_hogares` | Hecho | Hogar | Ingresos, líneas de pobreza e indigencia, brechas, banderas `pobre` e `indigente`, `fex_c`, `fex_dpto` |
+| `fact_personas` | Hecho | Persona | Ingresos, empleo principal y secundario, factores de expansión y versiones logarítmicas |
+| `dim_hogar` | Dimensión | Hogar | `directorio`, `secuencia_p`, tenencia y tamaño del hogar en rangos |
+| `dim_persona` | Dimensión | Persona | Sexo, edad, parentesco, nivel educativo, `condicion_laboral`, `pet`, `rango_edad` |
+| `dim_geografia` | Dimensión | `dpto` + `dominio` + `ciudad_sinam` + `clase` (76 filas) | Departamento (nombre), tipo de zona y clase |
+| `dim_tiempo` | Dimensión | Mes | Mes y nombre del mes |
+
+**Constelación 2 — Entrega 2 (comparación departamental).**
+
+| Tabla | Tipo | Grano | Contenido | Estado |
+|---|---|---|---|---|
+| `merge_departamento` | Hecho | Departamento | 16 columnas: marcas de cobertura (`en_ipm`, `en_csv`, `en_db`), bloque IPM, bloque de vivienda, bloque monetario y la diferencia entre IPM y pobreza monetaria (sección 5.5) | Implementada: la carga la tarea `load` |
+| `dim_departamento` | Dimensión | Departamento (33 filas) | `codigo_departamento` (PK, texto de 2 dígitos) y `nombre_departamento` (único), tomados del catálogo `DEPARTAMENTOS` | Propuesta: pendiente de implementar |
+
+**Relaciones.**
+
+| De | A | Tipo | Estado |
+|---|---|---|---|
+| `fact_hogares` y `fact_personas` | `dim_hogar`, `dim_persona`, `dim_geografia`, `dim_tiempo` | N:1 (llaves foráneas) | Implementadas en la Entrega 1 (DDL con PK y FK) |
+| `merge_departamento` | `dim_departamento` | 1:1 por `codigo_departamento` | Propuesta |
+| `dim_geografia` | `dim_departamento` | N:1, por nombre (`dpto` = `nombre_departamento`) | Relación lógica, sin llave foránea |
+
+**Decisiones de diseño y justificación.**
+1. **Galaxia y no estrella.** Hay más de un proceso analizado con granos distintos (hogar, persona y ahora departamento). Es el mismo razonamiento de la Entrega 1: un solo hecho obligaría a repetir medidas.
+2. **El hecho nuevo es por departamento.** El IPM y el CSV vienen de la ECV y la base de la Entrega 1 viene de la GEIH, y sus hogares no coinciden (sección 6). El territorio es el único eje que comparten las tres fuentes.
+3. **Una fila por departamento, con marcas de origen.** El `outer join` conserva los 33 departamentos; los 9 sin GEIH quedan con `en_db = False` y `pobreza_monetaria` nula a propósito.
+4. **`dim_departamento` como nivel superior de `dim_geografia`.** `dim_geografia` es más fina que un departamento (76 filas) y guarda el nombre, no el código. La dimensión nueva aporta la llave de 2 dígitos común a las tres fuentes y engancha la tabla nueva con el modelo anterior.
+5. **El enlace con `dim_geografia` es lógico, por nombre.** Agregarle una columna de código no es estable y los notebooks de la Entrega 1 recrean esa tabla (DROP y CREATE) y la columna se perdería al volver a correrlos.
+6. **Sin vínculo con `dim_tiempo`.** Las fuentes son cortes de una sola vigencia y de períodos distintos (IPM 2025; la vigencia de la GEIH está por confirmar), así que la tabla nueva no tiene eje de tiempo.
+7. **Sin vínculo con `dim_hogar`.** Esa dimensión contiene hogares de la GEIH; los del IPM son de otra encuesta y no son los mismos hogares.
+8. **Ponderación.** El IPM y la pobreza monetaria usan `fex_c`; el CSV no se pondera porque no trae factor de expansión. En la Entrega 1 los cortes departamentales usaron `fex_dpto`: queda como decisión por confirmar.
+9. **Cobertura.** La GEIH cubre 24 de los 33 departamentos; las comparaciones entre medidas usan los 24 con las tres fuentes y al menos 30 hogares en la muestra del IPM.
+
 ---
 
 ## 5. Extracción de las tres fuentes
@@ -123,7 +191,7 @@ Los tres notebooks siguen la misma estructura: **leer → EDA sobre datos crudos
 | Origen | API en un contenedor Docker propio | `viviendas_pdtos.csv` (DANE, IPM 2025, "Viviendas (Departamental)") | Supabase / PostgreSQL (modelo de la Entrega 1, GEIH) |
 | Grano | Hogar | Hogar | Persona (se resume a hogar) |
 | Llave | `directorio + secuencia_p` → `id_hogar` | `directorio + secuencia_p` → `id_hogar` | `directorio + secuencia_p` → `id_hogar` |
-| Tamaño de la última corrida | ≈ 87.060 hogares tras la limpieza _(confirmar columnas y duplicados con la corrida)_ | 87.060 filas crudas → 86.848 sin duplicados | 773.932 personas · 276.666 hogares |
+| Tamaño de la última corrida | ≈ 87.000 hogares | 87.060 filas crudas → 86.848 sin duplicados | 773.932 personas · 276.666 hogares |
 | Salida limpia | `ipm_api_clean.parquet` | `csv_clean.parquet` | `db_personas_clean.parquet`, `db_hogares_clean.parquet` y `db_monetaria_dpto.parquet` |
 | Suite de validación | `suite_api_ipm` | `suite_csv` | `suite_db_personas` y `suite_db_hogares` |
 
@@ -168,7 +236,7 @@ print(r.status_code, len(r.json()))
 - Se descartan las columnas casi vacías (`COLS_DESCARTAR`) y `secuencia_encuesta` si es idéntica a `personas`.
 - Se eliminan filas completamente duplicadas.
 
-**Resumen por departamento.** Se calcula el IPM promedio ponderado por departamento: `ipm_ponderado = Σ(ipm × fex_c) / Σ(fex_c)`, en escala 0 a 1. Esta idea es la que usa el merge para `ipm_promedio` y para la incidencia del IPM (% de hogares pobres ponderado con `fex_c`). (Un promedio de `ipm × fex_c` sin dividir por la suma de pesos no sirve: mezcla el nivel de pobreza con el tamaño de los factores de expansión.)
+**Resumen por departamento.** Se calcula el IPM promedio ponderado por departamento: `ipm_ponderado = Σ(ipm × fex_c) / Σ(fex_c)`, en escala 0 a 1. Esta idea es la que usa el merge para `ipm_promedio` y para la incidencia del IPM (% de hogares pobres ponderado con `fex_c`).
 
 **EDA visual.** Porcentaje de hogares pobres (`fex_c`) y de personas pobres (`fexp`), distribución del `ipm`, número de privaciones, tasa de privación por indicador y pobreza por departamento. Los departamentos con menos de 30 hogares en la muestra se marcan como poco confiables.
 
@@ -213,15 +281,16 @@ El sufijo `_vivienda` evita chocar con los indicadores `acueducto` y `alcantaril
 
 **Por qué esta fuente.** Aporta la pobreza monetaria (`fact_hogares.pobre`) y las características de las personas (ingreso, empleo, educación, edad), que se comparan con la pobreza multidimensional. Tablas del modelo y su tamaño: `dim_geografia` 76, `dim_tiempo` 12, `dim_hogar` y `fact_hogares` 276.666, `dim_persona` y `fact_personas` 773.932.
 
-**Conexión.** Sin credenciales en el código. El notebook prueba, en orden:
-1. `DATABASE_URL` (`postgresql://usuario:contraseña@host:puerto/base`) en variable de entorno o secretos de Colab.
+**Conexión.** No hay credenciales en el código y el notebook no pide nada por teclado. Prueba, en orden, y usa la primera opción que funcione:
+1. `DATABASE_URL` (`postgresql://usuario:contraseña@host:puerto/base`) en los secretos de Colab o en una variable de entorno.
 2. `PG_HOST`, `PG_USER` y `PG_PASSWORD` (opcionales `PG_DB` y `PG_PORT`).
-3. Una copia de las tablas en CSV dentro de `db_export/` (no necesita credenciales).
-4. Si no hay nada, pide la cadena de conexión una sola vez con el texto oculto.
+3. Los CSV de las tablas (`fact_personas`, `dim_persona`, `dim_geografia` y `fact_hogares`) en la carpeta `db_export` de `etl_proyecto` en Drive (también acepta `db_exports`). No necesitan credenciales.
 
-Si la conexión falla pero existe la copia en CSV, el notebook sigue con la copia. Cuando falla, imprime la causa probable sin mostrar la contraseña (por ejemplo, IPv6 con la conexión directa de Supabase, proyecto pausado o usuario sin el identificador del proyecto en el pooler). La copia en `db_export/` se genera una sola vez con `EXPORTAR_TABLAS = True` y se comparte por Drive, no por GitHub.
+El notebook queda en uno de dos modos, que imprime como `Modo de lectura`: `bd` (lee de Supabase) o `archivos` (lee los CSV). Si hay secretos pero la conexión falla, sigue con los CSV; si tampoco están, se detiene y lista cuáles faltan. Cuando la conexión falla imprime la causa probable (por ejemplo, IPv6 con la conexión directa de Supabase, proyecto pausado o usuario sin el identificador del proyecto en el pooler). Antes de conectar muestra el usuario, el host y cuántos caracteres tiene la contraseña, pero no la contraseña. Con el pooler de Supabase, si falla el puerto 5432 prueba también el 6543.
 
-**Extracción (`read_db`).** Une `fact_personas` con `dim_persona` por `id_persona` y con `dim_geografia` por `id_geografia`, leyendo por bloques de 100.000 filas. Guarda el crudo en `db_raw.parquet`.
+La copia en `db_export/` se genera una sola vez con `EXPORTAR_TABLAS = True` (desde una conexión activa) y se comparte por Drive, no por GitHub.
+
+**Extracción (`read_db`).** Une `fact_personas` con `dim_persona` por `id_persona` y con `dim_geografia` por `id_geografia`, leyendo por bloques de 100.000 filas (o desde los CSV, según el modo). Guarda el crudo en `db_raw.parquet`.
 
 **Cruce con las otras fuentes (Paso 5).** Compara los hogares de esta fuente con los de las fuentes 1 y 2 (ver sección 6).
 
@@ -235,12 +304,12 @@ Si la conexión falla pero existe la copia en CSV, el notebook sigue con la copi
 
 **Resumen por hogar (`resumen_hogar`).** Como las otras dos fuentes son por hogar, esta se resume a una fila por hogar: `personas_db`, `ingreso_total_hogar`, `ingreso_prom_persona` y `personas_ocupadas`. Son sumas y promedios sin ponderar.
 
-**Pobreza monetaria por departamento (`resumen_monetaria`).** Une `fact_hogares` con `dim_geografia` por `id_geografia` y calcula `pobreza_monetaria = Σ(pobre × fex_c) / Σ(fex_c) × 100` por departamento. Es la salida de esta fuente que se usa en el cruce con el IPM (guardada en `db_monetaria_dpto.parquet`). La base cubre **24 de los 33 departamentos** (faltan Arauca, Casanare, Putumayo, San Andrés, Amazonas, Guainía, Guaviare, Vaupés y Vichada). Este agregado no tiene suite propia; la suite del merge valida que `pobreza_monetaria` esté entre 0 y 100 y que el departamento sea único.
+**Pobreza monetaria por departamento (`resumen_monetaria`).** La función `leer_hogares_monetaria` une `fact_hogares` con `dim_geografia` por `id_geografia` (con una consulta SQL en modo `bd` o con los CSV en modo `archivos`, con el mismo resultado) y calcula `pobreza_monetaria = Σ(pobre × fex_c) / Σ(fex_c) × 100` por departamento. Es la salida de esta fuente que se usa en el cruce con el IPM (guardada en `db_monetaria_dpto.parquet`). La base cubre **24 de los 33 departamentos** (faltan Arauca, Casanare, Putumayo, San Andrés, Amazonas, Guainía, Guaviare, Vaupés y Vichada). Este agregado no tiene suite propia; la suite del merge valida que `pobreza_monetaria` esté entre 0 y 100 y que el departamento sea único.
 
 **Validación.** `suite_db_personas`: `id_persona` único y sin nulos, `fex_c` positivo, edad entre 0 y 110, `ingtot` no negativo, `sexo` y `condicion_laboral` dentro de sus categorías (con tolerancia de 1 % y 5 %). `suite_db_hogares`: llave sin nulos y única, `personas_db` mayor o igual a 1.
 
 
-### 5.5 Merge por departamento (`merge_completote.ipynb`)
+### 5.5 Merge y reporte para cargar al warehouse (`merge_definitivo.ipynb`)
 
 **Qué hace.** Lee los archivos limpios de los notebooks 01, 02 y 03, resume cada fuente a una fila por departamento y las une por `codigo_departamento` (texto de 2 dígitos) con un `outer join`. En la Parte 2 del mismo notebook el proceso completo se automatiza como DAG de Airflow (sección 11).
 
@@ -273,7 +342,46 @@ Resultado: **33 filas x 16 columnas**, una por departamento, ordenadas por códi
 
 **Salidas.** `staging/merge_departamento.parquet` y `.csv` (solo si la validación pasa), la tabla `merge_departamento` en la base de destino y el reporte (3 gráficas y 9 cifras) con consultas SQL a esa tabla.
 
-**Reporte.** Todas las cifras y gráficas del Paso 17 salen de consultas SQL a la tabla cargada, no de los archivos del merge, es decir, de datos que ya pasaron la validación. Las gráficas se guardan en `reports/`.
+**Reporte (Paso 17).** Todas las cifras y gráficas salen de consultas SQL a la tabla cargada y no de los archivos del merge, es decir, de datos que ya pasaron la validación. Son 9 cifras y 3 gráficas, que se guardan en `reports/`:
+1. Pobreza monetaria contra pobreza multidimensional (un punto por departamento).
+2. Las dos medidas por departamento.
+3. Hogares sin acueducto contra incidencia del IPM.
+
+**Conclusiones del reporte.**
+- **Cobertura.** De los 33 departamentos solo 24 tienen las tres fuentes; los 9 sin pobreza monetaria quedan fuera de las comparaciones.
+- **Las dos medidas van juntas.** La correlación es de 0,92: donde hay más pobreza por ingresos suele haber también más hogares con privaciones.
+- **Los extremos.** La Guajira tiene la mayor incidencia del IPM (34,5 %) y Chocó la mayor pobreza monetaria (54,4 %).
+- **La pobreza monetaria es más alta que el IPM** en los 24 departamentos comparados. Las dos medidas no miden lo mismo (ingresos frente a privaciones), por eso no coinciden.
+- **Acueducto e IPM.** En general, a más hogares sin acueducto, mayor incidencia del IPM. Meta es una excepción clara: cerca del 47 % de hogares sin acueducto y una incidencia del IPM cercana al 10 %.
+- **Límites.** Las cifras describen los datos y no explican causas. Los porcentajes de vivienda salen del CSV sin factor de expansión, así que describen la muestra. Con 24 puntos, la correlación no prueba que una variable cause la otra.
+
+### 5.6 Visualizaciones en Streamlit (`streamlit_visualizaciones_definitivo.ipynb`)
+
+**Qué es.** Una aplicación web (`app.py`) que muestra los indicadores por departamento con gráficas de Plotly. El notebook instala las librerías, escribe `app.py` con `%%writefile`, lo arranca en Colab (puerto 8501) y abre un enlace temporal con localtunnel.
+
+**De dónde salen los datos.** Es una decisión de diseño: la app lee del data warehouse y no de los archivos del merge, porque en el proyecto nos pedían que las visualizaciones se construyan sobre datos validados y almacenados.
+1. Si existe `DESTINO_URL` (secreto de Colab), consulta `SELECT * FROM merge_departamento`.
+2. Si no existe, o la consulta falla, lee `merge_departamento.csv`, que es el archivo que exporta la tarea `store` del DAG a partir de la misma tabla. Se busca en `MERGE_CSV` y en la carpeta `etl_proyecto` de Drive.
+
+La barra lateral indica de cuál de las dos salió lo que se está viendo. Los datos se guardan en caché 10 minutos y `codigo_departamento` se lee como texto para no perder el cero de `"05"`.
+
+**Qué muestra.** Un selector de departamento en la barra lateral ("Todos los departamentos" o uno) y cinco secciones:
+
+| Sección | Contenido |
+|---|---|
+| 1. Resumen de indicadores | Pobreza monetaria, incidencia del IPM, IPM promedio, sin acueducto, sin alcantarillado, piso de tierra y rural disperso. Con "Todos" muestra promedios simples entre departamentos con dato; con un departamento, sus valores. Si falta un dato, muestra "Sin datos". |
+| 2. Pobreza monetaria e IPM | Dispersión de pobreza monetaria contra IPM promedio, con el tamaño y el color por incidencia del IPM. Solo con "Todos". |
+| 3. Condiciones de vivienda | Barras por departamento (con "Todos") o por condición (con uno solo). |
+| 4. Disponibilidad de información | Para cada departamento, si tiene datos de cada fuente (`en_ipm`, `en_csv`, `en_db`). Hace visible que 9 departamentos no tienen pobreza monetaria. |
+| 5. Tabla departamental completa | La tabla filtrada y un botón para descargarla en CSV. |
+
+**Advertencias que muestra la propia app**
+- Los promedios del resumen son simples entre departamentos, no promedios nacionales ponderados.
+- Los porcentajes de vivienda describen los registros observados: el CSV no trae factor de expansión y no son estimaciones representativas.
+- A diferencia del reporte SQL, la app no aplica el mínimo de 30 hogares y muestra todos los departamentos que tengan el dato.
+
+**Cómo correrla.** Ver la sección 9, parte 3.
+
 ---
 
 ## 6. Verificación cruzada entre fuentes
@@ -319,6 +427,8 @@ Los notebooks 02 y 03 comparan las llaves de los hogares entre fuentes. Resultad
 16. **Calidad como compuerta.** Si falla una validación de `transform_*` o de `quality_check`, el DAG se detiene y no se carga nada en la tabla final.
 17. **Recarga completa.** La tabla final se reemplaza completa en cada ejecución (`if_exists='replace'`), así que repetir el DAG no duplica filas.
 18. **Base de destino.** Si no se define `DESTINO_URL`, la carga va a SQLite (útil para pruebas); para PostgreSQL se define `DESTINO_URL` con su cadena de conexión.
+19. **Origen sin credenciales.** Si no hay `DATABASE_URL` pero sí los CSV de `db_export`, el notebook 03 los lee directamente y el notebook del merge arma con ellos una base SQLite local desde la que el DAG lee igual que lo haría de PostgreSQL. Los resultados no cambian; solo cambia de dónde salen las tablas.
+20. **La app de Streamlit no recalcula nada.** Solo lee `merge_departamento` y muestra lo que ya pasó la validación.
 ---
 
 ## 8. Calidad de datos y registros
@@ -346,27 +456,34 @@ Cada notebook escribe en el mismo `validation_log.csv`; antes de entregar, convi
 ---
 ## 9. Cómo ejecutar
 
+> **Nota sobre los enlaces de als visualizaciones con streamlit.** Si alguna página da un error, no carga o muestra un error de código (el enlace de Cloudflare de Airflow o las gráficas de Streamlit), hay que recargar la página. Con recargarla hasta unas 5 veces se arregla.
+
 **Requisitos:** Google Colab, o Python 3.10+ en local, con:
 
 ```bash
 pip install "great-expectations>=1.0,<2" pandas pyarrow requests matplotlib scipy sqlalchemy psycopg2-binary
 ```
 
-**Carpeta de trabajo.** En Colab, `Mi unidad/Colab Notebooks/etl_proyecto/`; en local, `./etl_proyecto/`. Se crean `staging/` (archivos intermedios), `reports/` (registros y gráficos) y `db_export/` (copia de la base). Esta carpeta de trabajo está fuera del repositorio: al subir a GitHub solo se copian `reports/` (sin datos personales), los notebooks y el DAG.
+**Carpeta de trabajo.** En Colab, `Mi unidad/Colab Notebooks/etl_proyecto/`; en local, `./etl_proyecto/`. Se crean `staging/` (archivos intermedios) y `reports/` (registros y gráficos), y `db_export/` guarda la copia de la base. Esta carpeta de trabajo está fuera del repositorio: al subir a GitHub solo se copian `reports/` (sin datos personales), los notebooks y el DAG.
 
 **Parte 1: notebooks por fuente y merge.**
 1. `01_fuente_api_ipm_def.ipynb`: primero, porque deja `ipm_api_clean.parquet`, que usan los otros dos para comparar.
 2. `02_fuente_csv_def.ipynb`: requiere `viviendas_pdtos.csv` en la carpeta de trabajo o en `CSV_PATH`; si no está, Colab pide subirlo.
-3. `03_fuente_base_de_datos_def.ipynb`: requiere conexión a Supabase o la copia en `db_export/`. Debe guardar también `db_monetaria_dpto.parquet`.
-4. `merge_completote.ipynb`, Pasos 1 a 8: lee los archivos limpios de los tres notebooks anteriores y deja `merge_departamento.parquet` y `.csv`.
+3. `03_fuente_base_de_datos_def.ipynb`: lee de Supabase si hay `DATABASE_URL` en los secretos de Colab; si no, lee los CSV de `db_export/`. Debe guardar también `db_monetaria_dpto.parquet`.
+4. `merge_definitivo.ipynb`, Pasos 1 a 8: lee los archivos limpios de los tres notebooks anteriores y deja `merge_departamento.parquet` y `.csv`.
 
-**Parte 2: pipeline con Airflow** (`merge_completote.ipynb`, Pasos 9 a 19). El DAG no usa los archivos de los notebooks 01 a 03: lee las tres fuentes originales.
+**Parte 2: pipeline con Airflow** (`merge_definitivo.ipynb`, Pasos 9 a 19). El DAG no usa los archivos de los notebooks 01 a 03: lee las tres fuentes originales.
 1. Paso 1 (configuración), Paso 9 (entorno de Airflow, tarda unos minutos) y Paso 10 (variables y secretos).
-2. Paso 14: iniciar Airflow. Paso 15: ejecutar el DAG y esperar a que termine en `SUCCESS`.
+2. Paso 14: iniciar Airflow. La celda imprime el enlace de Cloudflare y el usuario y la contraseña para entrar a la interfaz. Paso 15: ejecutar el DAG y esperar a que termine en `SUCCESS`.
 3. Paso 16: revisar el registro de validación, la tabla final y los archivos guardados. Paso 17: reporte.
 4. Paso 19: copiar `dags/pobreza_dag.py` al repositorio.
 
-**La API.** El servidor Docker está encendido de forma permanente y responde en `API_URL`. _[Completar: enlace al repositorio o Dockerfile de la API y el comando para levantarla.]_
+**Parte 3: Streamlit** (`streamlit_visualizaciones_definitivo.ipynb`). Se corre después de la Parte 2, porque necesita `merge_departamento.csv` (lo genera la tarea `store`) o la base con la tabla cargada.
+1. Ejecutar las celdas en orden: instalar librerías, definir variables y montar Drive, escribir `app.py`, arrancar Streamlit y abrir el enlace.
+2. Para que la app lea de Supabase hay que tener el secreto `DESTINO_URL` en Colab. Sin él, usa el CSV.
+3. El enlace de localtunnel cambia en cada ejecución.
+
+**La API.** El servidor Docker está encendido de forma permanente y responde en `API_URL`.
 
 **Verificación rápida.** Después de ejecutar cada notebook debe aparecer `PASS` en la línea `[GE] ... -> PASS` y el mensaje `Guardado: ...`. Si aparece `FAIL`, revisar las reglas impresas debajo; el archivo limpio no se guarda. En el DAG, si una validación falla, la tarea queda en `failed` y las siguientes no se ejecutan.
 
@@ -374,13 +491,15 @@ pip install "great-expectations>=1.0,<2" pandas pyarrow requests matplotlib scip
 
 | Variable | Para qué sirve |
 |---|---|
-| `DATABASE_URL` | Base de datos de origen (Supabase). También se aceptan `PG_HOST`, `PG_USER`, `PG_PASSWORD` (opcionales `PG_DB`, `PG_PORT`). |
+| `DATABASE_URL` | Base de datos de origen (Supabase). También se aceptan `PG_HOST`, `PG_USER`, `PG_PASSWORD` (opcionales `PG_DB`, `PG_PORT`). Sin ella se usan los CSV de `db_export/`. |
 | `API_URL` (opcional) | Dirección de la API; por defecto `http://201.32.130.152/api/productos`. |
 | `CSV_PATH` (opcional) | Ruta de `viviendas_pdtos.csv`. |
-| `DESTINO_URL` (opcional) | Base donde se carga `merge_departamento`; por defecto SQLite. |
+| `DESTINO_URL` (opcional) | Base donde se carga `merge_departamento` (en la corrida final, Supabase) y de donde lee Streamlit; por defecto SQLite. |
 | `DAG_SCHEDULE` | `@daily` por defecto; en Colab se pone `none` para lanzar el DAG a mano. |
+| `MERGE_CSV` (Streamlit) | Ruta de `merge_departamento.csv`, para cuando la app no lee de la base. |
 
 Con Supabase desde Colab se recomienda la cadena del *Session pooler* (la conexión directa usa IPv6).
+
 ---
 ## 10. Estructura del repositorio
 
@@ -388,17 +507,29 @@ Con Supabase desde Colab se recomienda la cadena del *Session pooler* (la conexi
 .
 ├── README.md
 ├── .gitignore
+├── requirements.txt
+├── .env.examples  # nombres de las variables, sin valores
 ├── notebooks/
 │   ├── 01_fuente_api_ipm_def.ipynb
 │   ├── 02_fuente_csv_def.ipynb
 │   ├── 03_fuente_base_de_datos_def.ipynb
-│   ├── merge_completote.ipynb
-│   └── (Entrega 1) ETL_EDA_Hogares_DEF.ipynb, ETL_personas_DEF.ipynb
+│   ├── merge_definitivo.ipynb
+│   ├── streamlit_visualizaciones_definitivo.ipynb
 ├── dags/
 │   └── pobreza_dag.py         # DAG de Airflow (10 tareas, @daily)
-├── reports/                   # validation_log.csv, resúmenes de Great Expectations, hallazgos, gráficas y diagrama
-├── diagramas/                 # arquitectura y modelo dimensional
-└── documentos/
+├── streamlit/
+│   └──app.py               # la genera streamlit_visualizaciones_definitivo.ipynb
+├── graficas/                # validation_log.csv, resúmenes de Great Expectations, hallazgos, gráficas y diagramas.
+    ├──dashboard/    
+       └──...
+    └──eda/                # graficos relacioandos a los eda realizados
+       └──...
+├── reports/                # validation_log.csv, resúmenes de Great Expectations, hallazgos, gráficas y diagramas.
+    ├──...          
+├── diagramas/
+│   ├── Diagrama Arquitectura - Entrega 2.png   # arquitectura (sección 4.1)
+│   ├── Diagrama Galaxia - Entrega 2.png        # modelo dimensional (sección 4.2)
+│   └── Grafo del DAG.jpeg                      # esquema de la ejecución del DAG
 ```
 
 El `.gitignore` debe excluir como mínimo:
@@ -422,7 +553,9 @@ read_csv ──► transform_csv ──┼─► merge ─► quality_check ─�
 read_db  ──► transform_db  ──┘
 ```
 
-El DAG vive en `dags/pobreza_dag.py` (se genera desde `merge_completote.ipynb`) y trae todas las funciones, así que no depende de los notebooks.
+![Esquema del grafo del DAG con una ejecución exitosa](<diagramas/Grafo del DAG.jpeg>)
+
+El DAG vive en `dags/pobreza_dag.py` (se genera desde `merge_definitivo.ipynb`) y trae todas las funciones, así que no depende de los notebooks.
 
 | Tarea | Qué hace | Reintentos |
 |---|---|---|
@@ -442,17 +575,15 @@ El DAG vive en `dags/pobreza_dag.py` (se genera desde `merge_completote.ipynb`) 
 - Las tareas de lectura, `load` y `store` se reintentan una vez porque el fallo puede ser pasajero (API o base lentas). Las tareas `transform_*`, `merge` y `quality_check` no se reintentan: si los datos están mal, repetir no lo arregla.
 - La validación con Great Expectations es la compuerta de calidad: si falla una regla, la tarea falla, las siguientes no se ejecutan y la tabla final no se modifica.
 - `max_active_runs=1`: no corren dos ejecuciones a la vez.
-- En Colab las tres ramas corren una después de la otra (Airflow usa SQLite), no en paralelo.
+- - En Colab las tres ramas corren una después de la otra (Airflow usa SQLite), no en paralelo.
+- Si el origen es la copia en CSV (sin `DATABASE_URL`), `read_db` lee de una SQLite armada con esos CSV; con PostgreSQL lee de Supabase. El resto del DAG no cambia.
+- Para ver el DAG en Colab, el notebook levanta el scheduler y el servidor web de Airflow y abre un enlace de Cloudflare. Si el enlace no carga, se recarga la página (ver la nota de la sección 9).
 ---
-## 12. Pendiente para completar la Entrega 2
+## 12. Pendiente antes de entregar
 
-1. Streamlit: aplicación que lea `merge_departamento` (la tabla o el CSV) y muestre las gráficas.
-2. Completar la conclusión de la gráfica 3 (hogares sin acueducto contra incidencia del IPM) en el reporte.
-3. Subir al repositorio `dags/pobreza_dag.py`, las gráficas y el diagrama del pipeline (`reports/arquitectura_pipeline.png`).
-4. Confirmar que la carga final se hace en PostgreSQL (definiendo `DESTINO_URL`) y no en SQLite, y dejarlo escrito.
-5. Modelo de datos del warehouse: la Entrega 2 carga una sola tabla por departamento; si se quiere un esquema dimensional, reutilizar `dim_geografia` (76 filas, más fina que un departamento) agregando `codigo_departamento` y una vista de departamentos únicos.
-6. Diagrama de arquitectura final (corregir el diagrama de la Entrega 1, que tenía dos entradas sueltas que no existen en el modelo real) e informe técnico.
-7. Completar en el README el enlace al repositorio o Dockerfile de la API.
+1. Subir al repositorio `dags/pobreza_dag.py`, las gráficas, `app.py` y los PNG de la carpeta `diagramas/`, con las salidas de los notebooks borradas (sección 10).
+2. Antes de entregar, borrar `validation_log.csv` y volver a correr los notebooks para que no queden corridas de prueba repetidas.
+3. `dim_departamento` y las llaves foráneas (sección 4.2) quedan como propuesta de diseño: la tabla `merge_departamento` se carga sin ellas. Implementarlas implicaría ajustar `load` (DDL con PK y FK, y vaciar e insertar en lugar de reemplazar).
 
 ### Relación con el entregable
 
@@ -463,10 +594,10 @@ El DAG vive en `dags/pobreza_dag.py` (se genera desde `merge_completote.ipynb`) 
 | EDA | Notebooks 01 a 03 y `reports/hallazgos_*.md` | Listo |
 | Transformación y merge | Secciones 5 y 5.5; tareas `transform_*` y `merge` | Listo |
 | Great Expectations integrado al DAG | Secciones 8 y 11; 5 suites | Listo |
-| Carga a base relacional | Sección 5.5; tarea `load` | Listo (verificar destino PostgreSQL) |
-| Modelo de datos documentado | Sección 12, punto 5 | Pendiente |
-| Visualizaciones | Sección 5.5 (reporte SQL, 3 gráficas); Streamlit pendiente | Parcial |
+| Carga a base relacional | Sección 5.5; tarea `load` | Listo (Supabase) |
+| Modelo de datos documentado | Sección 4.2 y `diagramas/diagrama_galaxia_entrega2.drawio` | Listo; `dim_departamento` y las llaves foráneas quedan como propuesta de diseño |
+| Visualizaciones | Sección 5.5 (reporte SQL, 3 gráficas) y sección 5.6 (Streamlit) | Listo |
 | API: detalles y por qué se eligió | Sección 5.2 | Listo |
-| Diagrama de arquitectura | Sección 4 (texto) y `reports/arquitectura_pipeline.png` | Parcial |
+| Diagrama de arquitectura | Sección 4.1 y `diagramas/arquitectura_pipeline_entrega2.drawio` | Listo |
 | Supuestos y decisiones | Sección 7 | Listo |
-| `.gitignore`, README, visualizaciones | Sección 10 | Parcial |
+| `.gitignore`, README, visualizaciones | Secciones 5.6 y 10 | Listo; falta subir al repositorio (punto 1 de la sección 12) |
