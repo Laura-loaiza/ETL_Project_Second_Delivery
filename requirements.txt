@@ -7,4 +7,5 @@ psycopg2-binary
 great-expectations>=1.0,<2
 matplotlib
 streamlit
+scipy
 plotly
