@@ -1,0 +1,24 @@
+# secretos
+.env
+
+# datos y archivos intermedios
+etl_proyecto/
+staging/
+*.parquet
+*.pkl
+*.db
+*.sqlite
+
+# Airflow
+airflow/
+logs/
+
+# Python y notebooks
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# Streamlit
+streamlit.log
