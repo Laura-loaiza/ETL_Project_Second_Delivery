@@ -45,7 +45,7 @@ Nivel persona:
 8. ¿Cómo se comportan los ingresos de las personas según la condición de pobreza de su hogar?
 
 ---
-## 2. Checklist estado de la Entrega 2
+## 2. Resumen de la Entrega 2
 
 | Etapa | Estado |
 |---|---|
@@ -450,12 +450,12 @@ Cada validación usa una `ExpectationSuite` de Great Expectations 1.x y deja:
 
 En la última ejecución del DAG todas las reglas se cumplieron: `suite_api_ipm` 54 de 54, `suite_csv` 21 de 21, `suite_db_personas` 12 de 12, `suite_db_hogares` 5 de 5 y `suite_merge_departamento` 24 de 24. Cuando las validaciones corren dentro del DAG, el resumen queda en `reports/ge_<suite>_dag.json`.
 
-Cada notebook escribe en el mismo `validation_log.csv`; antes de entregar, conviene borrar el archivo y volver a ejecutar los tres para que el registro quede limpio y sin corridas de prueba repetidas.
+Cada notebook escribe en el mismo `validation_log.csv`.
 
 ---
 ## 9. Cómo ejecutar
 
-> **Nota sobre los enlaces de las visualizaciones con streamlit.** Si alguna página da un error, no carga o muestra un error de código (el enlace de Cloudflare de Airflow o las gráficas de Streamlit), hay que recargar la página. Con recargarla hasta unas 5 veces se arregla.
+   > **Nota.** Si el enlace temporal de Airflow (Cloudflare) o de Streamlit (localtunnel) no carga o muestra un error, recarga la página, a veces hacen falta varios intentos.
 
 **Requisitos.**
 - **Google Colab (recomendado).** No hay nada que instalar a mano: cada notebook instala sus librerías en su primera celda (`!pip install ...`).
@@ -474,7 +474,7 @@ Apache Airflow no está en `requirements.txt` porque exige un archivo de version
 
 **Datos.** Los datos no están en el repositorio por su tamaño. La carpeta `etl_proyecto` (con `viviendas_pdtos.csv`, `db_export/` y `merge_departamento.csv`) se descarga del enlace de Drive que aparece en [`data/README.md`](data/README.md). Para usarla en Colab hay que copiarla a `Mi unidad/Colab Notebooks/etl_proyecto/`; los pasos detallados están en ese archivo.
 
-**Carpeta de trabajo.** En Colab, `Mi unidad/Colab Notebooks/etl_proyecto/`; en local, `./etl_proyecto/`. Se crean `staging/` (archivos intermedios) y `reports/` (registros y gráficos), y `db_export/` guarda la copia de la base. Esta carpeta de trabajo está fuera del repositorio: al subir a GitHub solo se copian `reports/` (sin datos personales), los notebooks y el DAG.
+**Carpeta de trabajo.** En Colab, `Mi unidad/Colab Notebooks/etl_proyecto/`; en local, `./etl_proyecto/`. Se crean `staging/` (archivos intermedios) y `reports/` (registros y gráficos), y `db_export/` guarda la copia de la base. Esta carpeta de trabajo está fuera del repositorio, el repositorio solo contiene código, reportes y documentación; los datos viven en esa carpeta.
 
 **Parte 1: notebooks por fuente y merge.**
 1. `01_fuente_api_ipm_def.ipynb`: primero, porque deja `ipm_api_clean.parquet`, que usan los otros dos para comparar.
@@ -530,7 +530,7 @@ Con Supabase desde Colab se recomienda la cadena del *Session pooler* (la conexi
 ├── streamlit/
 │   └── app.py                   # la genera streamlit_visualizaciones_definitivo.ipynb
 ├── data/
-│   ├── README.md                # de dónde descargar los datos (enlace de Drive)
+│   └── README.md                # de dónde descargar los datos (enlace de Drive)
 ├── graficas/
 │   ├── dashboard/               # capturas de Streamlit y gráficas del reporte
 │   └── eda/                     # gráficas del EDA de cada fuente
@@ -571,7 +571,7 @@ venv/
 streamlit.log
 ```
 
-Los notebooks se publican con sus salidas como evidencia de la ejecución y no contienen contraseñas ni cadenas de conexión. Si se vuelven a ejecutar con `DATABASE_URL`, hay que revisar la celda de conexión, que imprime el usuario y el servidor (no la contraseña), antes de volver a subirlos.
+Los notebooks se publican con sus salidas como evidencia de la ejecución y no contienen contraseñas ni cadenas de conexión. 
 
 ---
 ## 11. DAG de Airflow (`pobreza_dag`)
@@ -609,19 +609,4 @@ El DAG vive en `dags/pobreza_dag.py` (se genera desde `merge_definitivo.ipynb`) 
 - Para ver el DAG en Colab, el notebook levanta el scheduler y el servidor web de Airflow y abre un enlace de Cloudflare. Si el enlace no carga, se recarga la página (ver la nota de la sección 9).
 ---
 
-### Relación con el entregable
 
-| Punto del entregable | Dónde está | Estado |
-|---|---|---|
-| Objetivos refinados | Sección 1 | Listo |
-| Tres fuentes y tres extracciones en Airflow | Secciones 5 y 11; tareas `read_api`, `read_csv`, `read_db` | Listo |
-| EDA | Notebooks 01 a 03 y `reports/hallazgos_*.md` | Listo |
-| Transformación y merge | Secciones 5 y 5.5; tareas `transform_*` y `merge` | Listo |
-| Great Expectations integrado al DAG | Secciones 8 y 11; 5 suites | Listo |
-| Carga a base relacional | Sección 5.5; tarea `load` | Listo (Supabase) |
-| Modelo de datos documentado | Sección 4.2 y `diagramas/Diagrama_Galaxia-Entrega_2.png` | Listo; `dim_departamento` y las llaves foráneas quedan como propuesta de diseño |
-| Visualizaciones | Sección 5.5 (reporte SQL, 3 gráficas) y sección 5.6 (Streamlit) | Listo |
-| API: detalles y por qué se eligió | Sección 5.2 | Listo |
-| Diagrama de arquitectura | Sección 4.1 y `diagramas/Diagrama_Arquitectura-Entrega_2.png` | Listo |
-| Supuestos y decisiones | Sección 7 | Listo |
-| `.gitignore`, README, visualizaciones | Secciones 5.6 y 10 | Listo; falta subir al repositorio (punto 1 de la sección 12) |
