@@ -1,4 +1,4 @@
-# Pobreza, Pobreza Extrema e Indigencia en Colombia — Proyecto ETL (G51)
+# Pobreza, Pobreza Extrema e Indigencia en Colombia — Proyecto ETL 
 
 **Universidad Autónoma de Occidente** — Facultad de Ingeniería y Ciencias Básicas
 **Programa:** Ingeniería de Datos e Inteligencia Artificial · **Curso:** ETL (G51)
