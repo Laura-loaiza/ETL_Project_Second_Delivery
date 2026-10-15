@@ -110,7 +110,7 @@ Nivel persona:
 
 ### 4.1 Diagrama de arquitectura
 
-![Arquitectura del pipeline](diagramas/Diagrama Arquitectura - Entrega 2.png)
+![Arquitectura del pipeline](diagramas/Diagrama_Arquitectura-Entrega_2.png)
 
 Sigue la estructura que pedía el entregable (extraer, transformar, merge, calidad, carga, data warehouse y visualización) y le agrega Airflow y la validación con Great Expectations. El notebook del merge genera además una versión simple en `reports/arquitectura_pipeline.png`.
 
@@ -136,7 +136,7 @@ Sigue la estructura que pedía el entregable (extraer, transformar, merge, calid
 
 ### 4.2 Modelo dimensional (esquema de galaxia/estrella)
 
-![Modelo dimensional](diagramas/Diagrama Galaxia - Entrega 2.png)
+![Modelo dimensional](diagramas/Diagrama_Galaxia-Entrega_2.png)
 
 El modelo de la entrega 1 se conserva y se le agrega una segunda constelación a nivel de departamento.
 
