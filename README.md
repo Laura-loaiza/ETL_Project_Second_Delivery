@@ -172,7 +172,7 @@ El modelo de la entrega 1 se conserva y se le agrega una segunda constelación a
 3. **Una fila por departamento, con marcas de origen.** El `outer join` conserva los 33 departamentos; los 9 sin GEIH quedan con `en_db = False` y `pobreza_monetaria` nula a propósito.
 4. **`dim_departamento` como nivel superior de `dim_geografia`.** `dim_geografia` es más fina que un departamento (76 filas) y guarda el nombre, no el código. La dimensión nueva aporta la llave de 2 dígitos común a las tres fuentes y engancha la tabla nueva con el modelo anterior.
 5. **El enlace con `dim_geografia` es lógico, por nombre.** Agregarle una columna de código no es estable y los notebooks de la Entrega 1 recrean esa tabla (DROP y CREATE) y la columna se perdería al volver a correrlos.
-6. **Sin vínculo con `dim_tiempo`.** Las fuentes son cortes de una sola vigencia y de períodos distintos (IPM 2025; la vigencia de la GEIH está por confirmar), así que la tabla nueva no tiene eje de tiempo.
+6. **Sin vínculo con `dim_tiempo`.** Las fuentes son cortes de una sola vigencia y de períodos distintos (IPM 2025; la GEIH de la primera entrega cubre 12 meses según `dim_tiempo`), así que la tabla nueva no tiene eje de tiempo.
 7. **Sin vínculo con `dim_hogar`.** Esa dimensión contiene hogares de la GEIH; los del IPM son de otra encuesta y no son los mismos hogares.
 8. **Ponderación.** El IPM y la pobreza monetaria usan `fex_c`; el CSV no se pondera porque no trae factor de expansión. En la Entrega 1 los cortes departamentales usaron `fex_dpto`: queda como decisión por confirmar.
 9. **Cobertura.** La GEIH cubre 24 de los 33 departamentos; las comparaciones entre medidas usan los 24 con las tres fuentes y al menos 30 hogares en la muestra del IPM.
