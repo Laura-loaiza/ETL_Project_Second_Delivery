@@ -1,0 +1,10 @@
+pandas>=2.1
+numpy
+pyarrow>=14
+requests
+sqlalchemy
+psycopg2-binary
+great-expectations>=1.0,<2
+matplotlib
+streamlit
+plotly
