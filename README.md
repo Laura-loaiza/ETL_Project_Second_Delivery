@@ -553,7 +553,7 @@ read_csv ──► transform_csv ──┼─► merge ─► quality_check ─�
 read_db  ──► transform_db  ──┘
 ```
 
-![Esquema del grafo del DAG con una ejecución exitosa](<diagramas/Grafo del DAG.jpeg>)
+![Esquema del grafo del DAG con una ejecución exitosa](diagramas/Grafo_del_DAG.jpeg)
 
 El DAG vive en `dags/pobreza_dag.py` (se genera desde `merge_definitivo.ipynb`) y trae todas las funciones, así que no depende de los notebooks.
 
